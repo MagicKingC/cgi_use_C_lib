@@ -254,6 +254,3 @@ void CGI_DEBUG(char *format,...)
     va_end(args);
 }
 
-
-// fprintf(cgiOut, "<a href='.html'>返回</a>"); 
-// fprintf(cgiOut, "<meta http-equiv=\"refresh\" content=\"1;url=../main%d.html\">", sto_no[0]);
