@@ -17,14 +17,91 @@ const struct Content_Type content_type_arr[CONENT_TYPE_NUM]={
     {OCTET_STREAM,"application/octet-stream"},
 };
 
+//解析数据到数据链表
+static int CGI_ExContext(CGI_HANDLE *handle, const char * data,int data_length,int data_list_class)
+{
+    //截取出表格数据
+    if (data)
+    {
+        char *key;
+        char *value;
+
+        int lenght = 0;
+        int key_length = 0;
+        int value_length = 0;
+
+        int IsFindKeyOrValue = 0;
+    
+       while ((data[lenght]) != '\0')
+       {
+
+           if (IsFindKeyOrValue == 0){//找key
+                
+                if (data[lenght] == '='){
+                    //拷贝key
+                    key = (char *)malloc(key_length+1);
+                    if (key)
+                    {
+                        memcpy(key,data+(lenght-key_length),key_length);
+                        key[key_length] = '\0';
+                        IsFindKeyOrValue = 1;
+                    }
+                }
+                 key_length++;
+ 
+           }else if (IsFindKeyOrValue == 1){//找value
+                
+                if (data[lenght] == '&'||lenght == data_length-1){
+                    int tem = 0;
+                    if (lenght == data_length-1){
+                        tem = 1;
+                    }
+                    value_length += tem;
+                    //拷贝数值
+                    value = (char *)malloc(value_length);
+                    if (value)
+                    {
+                        
+                        memcpy(value,data+(lenght-value_length+tem),value_length);
+                        CGI_DEBUG("key:%s -- value:%s -- value_length:%d<br>",key,value,value_length);
+                        value_length = 0;
+                        IsFindKeyOrValue = 0;
+                        //插入数据
+                        CGI_LIST_NODE *Node = CreateCGIListNode(key,value);
+                        if (data_list_class == PORT_FORM_LIST)
+                        {
+                            //port表单
+                            InsertCGIList(handle->post_data_list,Node);
+                        }else if (data_list_class == URL_QUERY_LIST)
+                        {
+                            //url数据
+                             InsertCGIList(handle->url_query_list,Node);
+                        }
+                        free(value);
+                    }
+
+                    if (key)
+                    {
+                        key_length = 0;
+                        free(key);
+                    }
+                }
+                value_length++;
+           }
+           lenght++;
+       }
+
+       return SUCCESS;
+    }
+    return ERROR;
+    
+}
 
 //获取请求类型
 int GetRequest(CGI_HANDLE *handle){
 
     char *content_class = NULL;
     unsigned char num = 0;
-
-    int form_lenght = 0;//表单长度
 
     //获取cgi的环境变量
     char *env = NULL;
@@ -35,10 +112,6 @@ int GetRequest(CGI_HANDLE *handle){
     content = getenv("CONTENT_TYPE");       //请求的内容类型
     quest_string = getenv("QUERY_STRING");  //获取请求发过来的信息，url后面的信息
 
-
-    // fprintf(stdout, "<H2>quest_string: %s</H2>",quest_string);
-
-
     if (!env)
     {
         return CGI_ERROR;
@@ -47,17 +120,15 @@ int GetRequest(CGI_HANDLE *handle){
     if(strcmp("POST",env) == 0){
         handle->request = POST;
         //获取表单的数据长度
-        form_lenght = atoi(getenv("CONTENT_LENGTH"));
-
+        handle->post_form_lenght = atoi(getenv("CONTENT_LENGTH"));
         handle->post_form = NULL;
-
-        handle->post_form = (char *)malloc(form_lenght+1);
-
+        handle->post_form = (char *)malloc(handle->post_form_lenght+1);
         if (handle->post_form != NULL)
         {
-             while(fgets(handle->post_form,form_lenght+1,stdin) != NULL);
-        }
-        
+            while(fgets(handle->post_form,handle->post_form_lenght+1,stdin) != NULL);
+            handle->post_data_list = InitCGIList();
+            CGI_ExContext(handle,handle->post_form,handle->post_form_lenght,PORT_FORM_LIST);//解析表格数据
+        } 
 
     }else if (strcmp("GET",env) == 0){
         handle->request = GET;
@@ -68,13 +139,14 @@ int GetRequest(CGI_HANDLE *handle){
         int query_len = strlen(quest_string) + 1;
         handle->url_query_data = NULL;
         handle->url_query_data = (char *)malloc(query_len);
-        if (!handle->url_query_data)
+        if (handle->url_query_data)
         {
-           memcpy(handle->url_query_data,quest_string,query_len);
+            memcpy(handle->url_query_data,quest_string,query_len);
+            handle->url_query_list = InitCGIList();
+            CGI_ExContext(handle,handle->url_query_data,query_len-1,URL_QUERY_LIST);//解析表格数据
         }
         
     }
-    
 
     if (content)
     {
@@ -87,79 +159,51 @@ int GetRequest(CGI_HANDLE *handle){
             }
         }
     }
-
-
     
     return CGI_SUCCESS;
 }
-//初始化表单
-//解析表单的数据
-int CGI_ExportFormContext(CGI_HANDLE *handle,const char * key,char *value){
-    int lenght = -1;
-    if (handle->post_form)
-    {
-        char *token;
-        char *split;
-        token = strtok(handle->post_form, "&");
-        while( token != NULL ) {
-            //获取字段
-            split = strtok(token, "=");
-            if (strcmp(split,key) == 0)
-            {
-                lenght = 0;
-                value = strtok(NULL, "=");
-                lenght = strlen(value);
-                // if (split)
-                // {
-                //      while ((*value++ = split[lenght]) != '\0')
-                //     {
-                //         lenght++;
-                //     }
-                // }
-            
-                return lenght;
-            }
-            
-            token = strtok(NULL, "&");
-        }
 
+
+//解析表单的数据
+int CGI_GetPortFormData(CGI_HANDLE *handle,const char * key,char *value){
+    int lenght = -1;
+    
+    if (handle->post_data_list)
+    {
+       CGI_LIST_NODE *Node =  FindCGIList(handle->post_data_list,key);
+       if (Node)
+       {
+           lenght = 0;
+           if (Node->value)
+           {
+                StrCopy(value,Node->value);
+                lenght = CountStrLenght(Node->value);
+           }
+           return lenght;
+       }
     }
     return lenght;
     
 }
 
 //解析url后面的查询数据
-int CGI_URLQueryValue(CGI_HANDLE *handle,char *key,char *value)
+int CGI_GetURLQueryValue(CGI_HANDLE *handle,const char * key,char *value)
 {
     int lenght = -1;
-    if (handle->url_query_data)
+    
+    if (handle->url_query_list)
     {
-        char *token;
-        char *split;
-        token = strtok(handle->url_query_data, "&");
-        while( token != NULL ) {
-            //获取字段
-            split = strtok(token, "=");
-            if (strcmp(split,key) == 0)
-            {
-                lenght = 0;
-                value = strtok(NULL, "=");
-                lenght = strlen(value);
-                // split = strtok(NULL, "=");
-                // if (split)
-                // {
-                //      while ((*value++ = split[lenght]) != '\0')
-                //     {
-                //         lenght++;
-                //     }
-                // }
-            
-                return lenght;
-            }
-            
-            token = strtok(NULL, "&");
-        }
-
+       CGI_LIST_NODE *Node =  FindCGIList(handle->url_query_list,key);
+       if (Node)
+       {
+           lenght = 0;
+           if (Node->value)
+           {
+                StrCopy(value,Node->value);
+                lenght = CountStrLenght(Node->value);
+           }
+           return lenght;
+       }
     }
     return lenght;
 }
@@ -186,6 +230,18 @@ void CGI_HandleClose(CGI_HANDLE *handle)
     {
         free(handle->url_query_data);
     }
+
+    if (handle->post_data_list)
+    {
+        DestoryCGIList(handle->post_data_list);
+    }
+
+    if (handle->url_query_list)
+    {
+        DestoryCGIList(handle->url_query_list);
+    }
+    
+    
 }
 
 //错误信息

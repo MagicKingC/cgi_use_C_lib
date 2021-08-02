@@ -1,6 +1,7 @@
 #ifndef _CGI_H_
 #define _CGI_H_
 
+#include "cgi_list.h"
 
 #define CONENT_TYPE_NUM 8
 
@@ -23,13 +24,22 @@ enum CONTENT_TYPE{
     NO_TYPE,        //不知名类型             
 };
 
+enum _LIST_CLASS_{
+    NO_LIST = -1,
+    PORT_FORM_LIST = 0,
+    URL_QUERY_LIST,
+};
 
 struct CGI_DATA
 {
     int request;
     int content_type;
+    int post_form_lenght;
     char *post_form;
     char *url_query_data;
+    CGI_LINK *post_data_list;
+    CGI_LINK *url_query_list;
+
 };
 
 struct Content_Type
@@ -40,15 +50,14 @@ struct Content_Type
 
 typedef struct CGI_DATA CGI_HANDLE;
 
-
+//调试函数
+void CGI_DEBUG(char *format,...);
 //获取请求类型
 int GetRequest(CGI_HANDLE *handle);
-
 //解析表单的数据
-int CGI_ExportFormContext(CGI_HANDLE *handle,const char * key,char *value);
+int CGI_GetPortFormData(CGI_HANDLE *handle,const char * key,char *value);
 //解析url后面的查询数据
-int CGI_URLQueryValue(CGI_HANDLE *handle,char *key,char *value);
-
+int CGI_GetURLQueryValue(CGI_HANDLE *handle,const char * key,char *value);
 //句柄
 void CGI_HandleCreate(CGI_HANDLE *handle,char *head);
 void CGI_HandleClose(CGI_HANDLE *handle);
