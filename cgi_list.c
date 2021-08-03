@@ -166,7 +166,6 @@ CGI_LIST_NODE * FindCGIList(CGI_LINK *HeardNode,const char *key)
         
     }
     return NULL;
-    //return *Node;
     
 }
 

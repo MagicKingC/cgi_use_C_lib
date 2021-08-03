@@ -17,6 +17,31 @@ const struct Content_Type content_type_arr[CONENT_TYPE_NUM]={
     {OCTET_STREAM,"application/octet-stream"},
 };
 
+//解析表单的数据
+static int CGI_GetPortFormData(CGI_HANDLE *handle,const char * name,char *value);
+//获取环境变量
+static char * CGI_GetEnvData(const char *env){
+    char *data_addr = NULL;
+    char * env_data = NULL;
+    env_data = getenv(env);
+
+    if (env_data)
+    {
+        int lenght = CountStrLenght(env_data);
+        if (lenght > 0)
+        {
+            data_addr = (char *)malloc(lenght);
+            if (data_addr)
+            {
+                StrCopy(data_addr,env_data);
+            }
+            
+        }
+        
+    }
+    return data_addr;
+}
+
 //解析数据到数据链表
 static int CGI_ExContext(CGI_HANDLE *handle, const char * data,int data_length,int data_list_class)
 {
@@ -63,7 +88,7 @@ static int CGI_ExContext(CGI_HANDLE *handle, const char * data,int data_length,i
                     {
                         
                         memcpy(value,data+(lenght-value_length+tem),value_length);
-                        CGI_DEBUG("key:%s -- value:%s -- value_length:%d<br>",key,value,value_length);
+                        value[value_length]='\0';
                         value_length = 0;
                         IsFindKeyOrValue = 0;
                         //插入数据
@@ -110,26 +135,30 @@ int GetRequest(CGI_HANDLE *handle){
 
     env = getenv("REQUEST_METHOD");         //请求类型
     content = getenv("CONTENT_TYPE");       //请求的内容类型
-    quest_string = getenv("QUERY_STRING");  //获取请求发过来的信息，url后面的信息
+    quest_string = getenv("QUERY_STRING");  //获取请求发过来的信息，url后面的信息 
 
     if (!env)
     {
         return CGI_ERROR;
     }
 
+    // CGI_DEBUG("HTTP_USER_AGENT:%s<br>",getenv("HTTP_USER_AGENT"));
+
     if(strcmp("POST",env) == 0){
         handle->request = POST;
         //获取表单的数据长度
-        handle->post_form_lenght = atoi(getenv("CONTENT_LENGTH"));
-        handle->post_form = NULL;
-        handle->post_form = (char *)malloc(handle->post_form_lenght+1);
-        if (handle->post_form != NULL)
+        handle->port_form_lenght = atoi(getenv("CONTENT_LENGTH"));
+        if (handle->port_form_lenght > 0)
         {
-            while(fgets(handle->post_form,handle->post_form_lenght+1,stdin) != NULL);
-            handle->post_data_list = InitCGIList();
-            CGI_ExContext(handle,handle->post_form,handle->post_form_lenght,PORT_FORM_LIST);//解析表格数据
-        } 
-
+            handle->port_form = NULL;
+            handle->port_form = (char *)malloc(handle->port_form_lenght+1);
+            if (handle->port_form != NULL)
+            {
+                while(fgets(handle->port_form,handle->port_form_lenght+1,stdin) != NULL);
+                handle->post_data_list = InitCGIList();
+                CGI_ExContext(handle,handle->port_form,handle->port_form_lenght,PORT_FORM_LIST);//解析表格数据
+            } 
+        }
     }else if (strcmp("GET",env) == 0){
         handle->request = GET;
     }
@@ -163,49 +192,170 @@ int GetRequest(CGI_HANDLE *handle){
     return CGI_SUCCESS;
 }
 
-
-//解析表单的数据
-int CGI_GetPortFormData(CGI_HANDLE *handle,const char * key,char *value){
-    int lenght = -1;
+//获取表单的数据
+static int CGI_GetPortFormData(CGI_HANDLE *handle,const char * name,char *value){
     
     if (handle->post_data_list)
     {
-       CGI_LIST_NODE *Node =  FindCGIList(handle->post_data_list,key);
+       CGI_LIST_NODE *Node =  FindCGIList(handle->post_data_list,name);
        if (Node)
        {
-           lenght = 0;
            if (Node->value)
            {
                 StrCopy(value,Node->value);
-                lenght = CountStrLenght(Node->value);
            }
-           return lenght;
+           return CGI_FIND_DATA;
        }
     }
-    return lenght;
+    return CGI_NO_FIND_DATA;
     
 }
 
 //解析url后面的查询数据
-int CGI_GetURLQueryValue(CGI_HANDLE *handle,const char * key,char *value)
+int CGI_GetURLQueryValue(CGI_HANDLE *handle,const char * name,char *value)
 {
-    int lenght = -1;
-    
     if (handle->url_query_list)
     {
-       CGI_LIST_NODE *Node =  FindCGIList(handle->url_query_list,key);
+       CGI_LIST_NODE *Node =  FindCGIList(handle->url_query_list,name);
        if (Node)
        {
-           lenght = 0;
            if (Node->value)
            {
                 StrCopy(value,Node->value);
-                lenght = CountStrLenght(Node->value);
            }
-           return lenght;
+           return CGI_FIND_DATA;
        }
     }
-    return lenght;
+    return CGI_NO_FIND_DATA;
+}
+
+//获取服务器IP地址
+char * CGI_GetServiceIPAddress(CGI_HANDLE *handle)
+{
+    handle->service_addr = NULL;
+    handle->service_addr = CGI_GetEnvData("SERVER_NAME");
+    return handle->service_addr;
+}
+
+//获取服务器端口号
+int CGI_GetServicePort(CGI_HANDLE *handle)
+{
+    handle->service_port =atoi(getenv("SERVER_PORT"));
+    return handle->service_port;
+}
+
+//获取服务器类型
+char *CGI_GetServiceSoftWare(CGI_HANDLE *handle)
+{
+    handle->service_software = NULL;
+    handle->service_software = CGI_GetEnvData("SERVER_SOFTWARE");
+    return handle->service_software;
+}
+
+//获取客户端IP地址
+char * CGI_GetClientIPAddress(CGI_HANDLE *handle)
+{
+    handle->client_addr = NULL;
+    handle->client_addr = CGI_GetEnvData("REMOTE_ADDR");
+    return handle->client_addr;
+}
+
+//获取客户端主机名
+char * CGI_GetClientHost(CGI_HANDLE *handle)
+{
+    handle->client_host = NULL;
+    handle->client_host = CGI_GetEnvData("REMOTE_HOST");
+    return handle->client_host;
+}
+
+//获取CGI版本
+char *CGI_GetVerSion(CGI_HANDLE *handle)
+{
+    handle->cgi_version = NULL;
+    handle->cgi_version = CGI_GetEnvData("GATEWAY_INTERFACE");
+    return handle->cgi_version;
+}
+
+//获取CGI脚本路径
+char *CGI_GetCGIPath(CGI_HANDLE *handle)
+{
+    handle->cgi_path = NULL;
+    handle->cgi_path = CGI_GetEnvData("SCRIPT_NAME");
+    return handle->cgi_path;
+}
+
+//服务器的http协议
+char *CGI_GetServiceHttpProtocol(CGI_HANDLE *handle)
+{
+    handle->cgi_path = NULL;
+    handle->cgi_path = CGI_GetEnvData("SERVER_PROTOCOL");
+    return handle->cgi_path;
+}
+
+//获取浏览器的信息
+char * CGI_GetHTTPUserAgent(CGI_HANDLE *handle)
+{
+    handle->http_user_agent = NULL;
+    handle->http_user_agent = CGI_GetEnvData("HTTP_USER_AGENT");
+    return handle->http_user_agent;
+}
+
+//复选框
+int CGI_CheckboxStatus(CGI_HANDLE *handle,char *name){
+    char name_arr[1];
+    if (handle->request == POST)
+    {
+        if(CGI_GetPortFormData(handle,name,name_arr) == CGI_FIND_DATA){
+            return CGI_CHECK;
+        }
+    }else{
+        if(CGI_GetURLQueryValue(handle,name,name_arr) == CGI_FIND_DATA){
+            return CGI_CHECK;
+        }
+    }
+    return CGI_UNCHECK;
+}
+
+//输入框
+int CGI_GetInputValue(CGI_HANDLE *handle,char *name,char *data)
+{
+    if (handle->request == POST)
+    {
+        if(CGI_GetPortFormData(handle,name,data) == CGI_FIND_DATA){
+            return CGI_SUCCESS;
+        }
+    }else{
+        if(CGI_GetURLQueryValue(handle,name,data) == CGI_FIND_DATA){
+            return CGI_SUCCESS;
+        }
+    }
+    return CGI_ERROR;
+
+}
+
+//单选框
+int CGI_RadioButtonsValue(CGI_HANDLE *handle,char *name,char *value)
+{
+    if (handle->request == POST)
+    {
+        if(CGI_GetPortFormData(handle,name,value) == CGI_FIND_DATA){
+            return CGI_SUCCESS;
+        }
+    }else{
+        if(CGI_GetURLQueryValue(handle,name,value) == CGI_FIND_DATA){
+            return CGI_SUCCESS;
+        }
+    }
+    return CGI_ERROR;
+}
+
+//下拉框
+int CGI_SelectValue(CGI_HANDLE *handle,char *name,char *value)
+{
+    if(CGI_GetPortFormData(handle,name,value) == CGI_FIND_DATA){
+        return CGI_SUCCESS;
+    }
+    return CGI_ERROR;
 }
 
 //创建cgi句柄
@@ -221,14 +371,54 @@ void CGI_HandleCreate(CGI_HANDLE *handle,char *head)
 void CGI_HandleClose(CGI_HANDLE *handle)
 {
 
-    if (handle->post_form)
+    if (handle->port_form)
     {
-        free(handle->post_form);
+        free(handle->port_form);
     }
 
     if (handle->url_query_data)
     {
         free(handle->url_query_data);
+    }
+
+    if (handle->service_addr)
+    {
+        free(handle->service_addr);
+    }
+    
+    if (handle->service_software)
+    {
+        free(handle->service_software);
+    }
+
+    if (handle->client_addr)
+    {
+        free(handle->client_addr);
+    }
+
+    if (handle->client_host)
+    {
+        free(handle->client_addr);
+    }
+
+    if (handle->http_user_agent)
+    {
+        free(handle->http_user_agent);
+    }
+
+    if (handle->cgi_version)
+    {
+        free(handle->cgi_version);
+    }
+
+     if (handle->cgi_path)
+    {
+        free(handle->cgi_path);
+    }
+
+        if (handle->http_protocol)
+    {
+        free(handle->http_protocol);
     }
 
     if (handle->post_data_list)
@@ -241,10 +431,9 @@ void CGI_HandleClose(CGI_HANDLE *handle)
         DestoryCGIList(handle->url_query_list);
     }
     
-    
 }
 
-//错误信息
+//信息调试函数
 void CGI_DEBUG(char *format,...)
 {
 
