@@ -3,7 +3,7 @@
 （注意：假如使用过程发现有什么问题希望能够指出，谢谢）<br>
 
 下面是cgi库中的函数，这里不一一介绍，主要介绍两个函数，
-CGI_HandleCreate句柄初始化函数，该函数需要传递两个参数，一个是CGI_HANDLE，
+CGI_HandleCreate句柄初始化函数，该函数需要传递两个参数，一个是CGI_HANDLE，<br>
 另一个是head为http的头部内容一般为：content-type:text/html
 CGI_HANDLE的主要包括以下内容：
 struct CGI_DATA
