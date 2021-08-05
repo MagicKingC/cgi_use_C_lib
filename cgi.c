@@ -142,26 +142,60 @@ int GetRequest(CGI_HANDLE *handle){
         return CGI_ERROR;
     }
 
-    // CGI_DEBUG("HTTP_USER_AGENT:%s<br>",getenv("HTTP_USER_AGENT"));
+    // CGI_DEBUG("CONTENT_TYPE:%s\n",getenv("CONTENT_TYPE"));
+    //判断传输过来的数据是什么类型
+    if (content)
+    {
+        for ( num = 0; num < CONENT_TYPE_NUM; num++)
+        {
+            if (strncmp(content_type_arr[num].text,content,strlen(content_type_arr[num].text))==0)
+            {
+                handle->content_type = content_type_arr[num].Type;
+                break;
+            }
+        }
+    }
 
     if(strcmp("POST",env) == 0){
         handle->request = POST;
-        //获取表单的数据长度
-        handle->port_form_lenght = atoi(getenv("CONTENT_LENGTH"));
-        if (handle->port_form_lenght > 0)
-        {
-            handle->port_form = NULL;
-            handle->port_form = (char *)malloc(handle->port_form_lenght+1);
-            if (handle->port_form != NULL)
-            {
-                while(fgets(handle->port_form,handle->port_form_lenght+1,stdin) != NULL);
-                handle->post_data_list = InitCGIList();
-                CGI_ExContext(handle,handle->port_form,handle->port_form_lenght,PORT_FORM_LIST);//解析表格数据
-            } 
-        }
     }else if (strcmp("GET",env) == 0){
         handle->request = GET;
     }
+
+    //表单数据
+    if ( handle->content_type == FORM)
+    {
+        //获取表单的数据长度
+        handle->http_data_lenght = atoi(getenv("CONTENT_LENGTH"));
+        if (handle->http_data_lenght > 0)
+        {
+            handle->port_form = NULL;
+            handle->port_form = (char *)malloc(handle->http_data_lenght+1);
+            if (handle->port_form != NULL)
+            {
+                while(fgets(handle->port_form,handle->http_data_lenght+1,stdin) != NULL);
+                handle->post_data_list = InitCGIList();
+                CGI_ExContext(handle,handle->port_form,handle->http_data_lenght,PORT_FORM_LIST);//解析表格数据
+                
+            } 
+        }
+    }else if (handle->content_type == JSON)//json数据
+    {
+        //获取json数据长度
+        handle->http_data_lenght = atoi(getenv("CONTENT_LENGTH"));
+        if (handle->http_data_lenght > 0)
+        {
+            handle->json_data = NULL;
+            handle->json_data = (char *)malloc(handle->http_data_lenght+1);
+            if (handle->json_data != NULL)
+            {
+                while(fgets(handle->json_data,handle->http_data_lenght+1,stdin) != NULL);
+                CGI_DEBUG("json:%s\n",handle->json_data);
+            } 
+        }
+    }
+    
+    
 
     if (quest_string)
     {
@@ -174,19 +208,7 @@ int GetRequest(CGI_HANDLE *handle){
             handle->url_query_list = InitCGIList();
             CGI_ExContext(handle,handle->url_query_data,query_len-1,URL_QUERY_LIST);//解析表格数据
         }
-        
-    }
-
-    if (content)
-    {
-        for ( num = 0; num < CONENT_TYPE_NUM; num++)
-        {
-            if (strcmp(content_type_arr[num].text,content)==0)
-            {
-                handle->content_type = content_type_arr[num].Type;
-                return CGI_SUCCESS;
-            }
-        }
+        return CGI_SUCCESS;
     }
     
     return CGI_SUCCESS;
@@ -374,6 +396,11 @@ void CGI_HandleClose(CGI_HANDLE *handle)
     if (handle->port_form)
     {
         free(handle->port_form);
+    }
+
+    if (handle->json_data)
+    {
+        free(handle->json_data);
     }
 
     if (handle->url_query_data)

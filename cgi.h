@@ -46,8 +46,9 @@ struct CGI_DATA
 {
     int request;                
     int content_type;           
-    int port_form_lenght;       //表格数据长度
+    int http_data_lenght;       //数据长度
     char *port_form;            //表格参数
+    char *json_data;            //json数据
     char *url_query_data;       //url的参数
     char *service_addr;         //服务器ip地址
     char *service_software;     //服务器的软件名
@@ -60,7 +61,6 @@ struct CGI_DATA
     int service_port;
     CGI_LINK *post_data_list;
     CGI_LINK *url_query_list;
-
 };
 
 struct Content_Type
@@ -89,14 +89,12 @@ char * CGI_GetClientIPAddress(CGI_HANDLE *handle);
 char * CGI_GetClientHost(CGI_HANDLE *handle);
 //获取浏览器的信息
 char * CGI_GetHTTPUserAgent(CGI_HANDLE *handle);
-
 //获取CGI版本
 char *CGI_GetVerSion(CGI_HANDLE *handle);
 //获取CGI脚本路径
 char *CGI_GetCGIPath(CGI_HANDLE *handle);
 //服务器的http协议
 char *CGI_GetServiceHttpProtocol(CGI_HANDLE *handle);
-
 //复选框
 int CGI_CheckboxStatus(CGI_HANDLE *handle,char *name);
 //输入框
