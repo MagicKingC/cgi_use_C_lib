@@ -1,4 +1,5 @@
-# cgi-
+### cgi库使用
+
 在Linux环境下，用标准c写的一套cgi库
 （注意：假如使用过程发现有什么问题希望能够指出，谢谢
 
@@ -6,6 +7,8 @@
 CGI_HandleCreate句柄初始化函数，该函数需要传递两个参数，一个是CGI_HANDLE
 另一个是head为http的头部内容一般为：content-type:text/html
 CGI_HANDLE的主要包括以下内容：
+
+```c
 struct CGI_DATA
 {
     int request;                
@@ -25,7 +28,9 @@ struct CGI_DATA
     CGI_LINK *post_data_list;
     CGI_LINK *url_query_list;
 };
+```
 
+```c
 CGI_HandleClose函数，该函数主要用于释放申请的资源，是和CGI_HandleCreate配套使用，如果在结束之后使用该函数会导致申请的内存无法释放
 
 //调试函数
@@ -63,4 +68,5 @@ int CGI_SelectValue(CGI_HANDLE *handle,char *name,char *value);
 //句柄
 void CGI_HandleCreate(CGI_HANDLE *handle,char *head);
 void CGI_HandleClose(CGI_HANDLE *handle);
+```
 
